@@ -1,5 +1,5 @@
 const puppeteer = require ("puppeteer");
-const { compose } = require("redux");
+const downloadsFolder = require('downloads-folder')
 
 const login = {
     username: "coop.test@condoworks.co",
@@ -9,7 +9,9 @@ async function getPDF(){
     // Opening puppeteer 
     const browser = await puppeteer.launch({ 
         headless: false,
+        userDatadir: '/puppeteer'
     })
+
     const page = await browser.newPage()
     await page.setViewport({
         width: 1900,
@@ -27,34 +29,61 @@ async function getPDF(){
     await page.type(PasswordInput, login.password)
     await page.click(submitBtn)
 
-    await page.waitForNavigation().then(console.log('logged in'))
+    await page.waitForNavigation()
 
     // Navigate to invoices  
     await page.goto("https://app-dev.condoworks.co/invoices/all",   {waitUntil: 'domcontentloaded'})
-    await page.goto("https://app-dev.condoworks.co/invoices/all",   {waitUntil: 'domcontentloaded'})
 
+    // Input into Invoice # 
+    // Puppeteer couldn't find the selector for the input so I had to do in vanilla JS
+    await page.$eval("#gridId", async () => {
+        // Input 123 
+        const inputTarget = document.getElementById('gs_invoices.InvoiceNumber')
+        inputTarget.value = '123'
 
-    const invoiceNumberInput = "#gs_invoices.InvoiceNumber"
-    const viewInvoiceBtn = '.btn-outline-secondary'
+        // Wait a second for DOM to be updated 
+        setTimeout(() => { 
+            // Gets all invoice number elements 
+            const list = document.querySelectorAll('[aria-describedby="grid4d1e941d1c0c1e4ec4887684a2cb0530d_invoices.InvoiceNumber"]')
 
-    // search (bad)
-    // page.click('#gs_invoices.InvoiceNumber').then(console.log('aaasasdasdasdas'))
-    // await page.click('#gridId').then(console.log('aaasasdasdasdas'))
-    //await page.waitForSelector('#gridId', {visible: true}).then(console.log('found1'))
-    // await page.waitForSelector(invoiceNumberInput, {visible: true}).then(console.log('found2')).catch(() => console.error('coudlnt find'))
+            // Looks for element matching the target (123444)
+            list.forEach(async (td) => {
+                if (td.innerHTML === "123444"){
+                    // Gets button element from the same row as matching target
+                    const targetLink = td.parentElement.firstChild.firstChild
+                    console.log(targetLink)
+                    targetLink.click()
+                }
+            })
+        }, 1000);
+        
+    })
 
-    const ref = await page.$('#gridId').then((res) => console.log(res))
+    // Code periodically checks if page has changed from the invoice search 
+    // Await in previous function does not wait for the callbacks inside to complete, needed to manually check 
 
-    // setTimeout(async () =>{
-    //     await page.waitForSelector(invoiceNumberInput, {visible: true}).then(console.log('found'))
-    //     await page.click(invoiceNumberInput).then(console.log('clicked'))
-    //     await page.type(invoiceNumberInput, "123").then(console.log('asada'))
-    //     await page.waitForResponse(res => res.status() == 200)
-    //     await page.click(viewInvoiceBtn)
-    // }, 1000)
+    const interval = setInterval(() => {
+        if (page.url() === "https://app-dev.condoworks.co/invoices/all"){
+        }
+        else{
+            download()
+        }
+    }, 1000)
+
+    async function download(){
+        // Stops interval 
+        clearInterval(interval)
+
+        // Clicks download 
+        await page.click("#thumb-InvoiceFile-init-0 > div.file-thumbnail-footer > div.file-actions > div > a")
+            .then(async () =>{
+                console.log('File downloaded to: ' + downloadsFolder())
+            })
+    }
+
 }
 
 getPDF().catch((er) => {
     console.error(er)
-    console.error('couldnt find selector')
+    console.error('Puppeteer failed task!')
 })
