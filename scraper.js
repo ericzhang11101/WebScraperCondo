@@ -36,6 +36,7 @@ async function getPDF(){
 
     // Input into Invoice # 
     // Puppeteer couldn't find the selector for the input so I had to do in vanilla JS
+    // Would be much cleaner to type with puppeteer
     await page.$eval("#gridId", async () => {
         // Input 123 
         const inputTarget = document.getElementById('gs_invoices.InvoiceNumber')
